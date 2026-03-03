@@ -13,12 +13,10 @@ config:
    description: "{{DESCRIPTION}}"
 
 variables:
-   EndUserId: linked string
-      source: @MessagingSession.MessagingEndUserId
-      description: "MessagingEndUser Id"
-   RoutableId: linked string
-      source: @MessagingSession.Id
-      description: "MessagingSession Id"
+   # NOTE: Only add linked MessagingSession variables if deploying to a
+   # messaging channel (WhatsApp, web chat with Messaging). For web-only
+   # agents without Messaging configured, linked variables cause
+   # "Internal Error" on publish.
    escalation_requested: mutable boolean = False
       description: "Whether the user has explicitly asked to speak with a human agent"
 
@@ -33,8 +31,6 @@ knowledge:
 
 language:
    default_locale: "{{LOCALE}}"
-   additional_locales: ""
-   all_additional_locales: False
 
 start_agent topic_selector:
    label: "Topic Selector"

@@ -412,3 +412,46 @@ After activating a new agent version, existing sessions may continue using a cac
 # For testing, always start a fresh session after publishing.
 # In production, consider session TTLs or notifying users to restart.
 ```
+
+### 21. Linked MessagingSession variables without Messaging configured
+
+Including `linked string` variables referencing `@MessagingSession` in an agent
+deployed to an org without Messaging enabled causes "Internal Error, try again
+later" on `sf agent publish`. Validation passes — the error is server-side only.
+
+```
+# WRONG — linked messaging variables in a web-only FAQ agent
+variables:
+   EndUserId: linked string
+      source: @MessagingSession.MessagingEndUserId
+      description: "MessagingEndUser Id"
+   RoutableId: linked string
+      source: @MessagingSession.Id
+      description: "MessagingSession Id"
+   escalation_requested: mutable boolean = False
+```
+
+```
+# RIGHT — omit linked variables unless Messaging is configured
+variables:
+   escalation_requested: mutable boolean = False
+   # Add linked MessagingSession variables ONLY if deploying to a
+   # messaging channel (WhatsApp, web chat with Messaging for Web/In-App)
+```
+
+### 22. Regional locale codes in language block
+
+Agent Script only accepts base language codes (`es`, `en`, `pt`). Regional
+variants like `es_CO`, `en_US`, `pt_BR` cause validation errors.
+
+```
+# WRONG
+language:
+   default_locale: "es_CO"
+```
+
+```
+# RIGHT
+language:
+   default_locale: "es"
+```

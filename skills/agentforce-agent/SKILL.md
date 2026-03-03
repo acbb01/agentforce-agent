@@ -497,11 +497,18 @@ config:
 
 Generate variables in this order:
 
-1. **Linked messaging variables** (no defaults, no type declaration):
+1. **Linked messaging variables** — ONLY include if the channel is `whatsapp` or
+   `messaging`. Do NOT include for `web` channel without Messaging configured.
+   Linked variables referencing `@MessagingSession` cause "Internal Error" on
+   publish if Messaging is not set up in the org.
    ```
    variables:
-      $Contact.FirstName:
-      $Contact.LastName:
+      EndUserId: linked string
+         source: @MessagingSession.MessagingEndUserId
+         description: "MessagingEndUser Id"
+      RoutableId: linked string
+         source: @MessagingSession.Id
+         description: "MessagingSession Id"
    ```
 
 2. **Mutable variables for each action topic's data collection**:
@@ -569,8 +576,16 @@ If `knowledge.citationsEnabled` is true in the config, set to `True` instead.
 #### 3e. language block
 
 ```
-language: "<language from config>"
+language:
+   default_locale: "<language from config>"
 ```
+
+IMPORTANT: The locale must be a base language code (`es`, `en`, `pt`, `fr`), NOT a
+regional variant (`es_CO`, `en_US`, `pt_BR`). Agent Script does not accept regional
+locales. If the config has a regional locale, strip the region suffix (e.g., `es_CO` → `es`).
+
+Do NOT include `additional_locales` or `all_additional_locales` fields unless the user
+explicitly requests multi-language support.
 
 #### 3f. start_agent topic_selector
 

@@ -71,10 +71,33 @@ Session traces saved to `.sfdx/agents/<agent-name>/sessions/<session-id>/`.
 | Error | Cause | Fix |
 |-------|-------|-----|
 | "Internal Error, try again later" | Managed action target (EmployeeCopilot__*) | Use `knowledge:` block instead |
+| "Internal Error, try again later" | Linked `@MessagingSession` variables without Messaging | Remove linked variables for web-only agents |
+| "Internal Error, try again later" | Org/server-side issue (validation passes) | Re-auth, retry; try deploy+retrieve workaround below |
+| Invalid `default_locale` | Regional locale like `es_CO` | Use base code: `es`, `en`, `pt` |
 | "Expected 3, but got 4" | Inconsistent indentation | Fix to 3-space indent throughout |
 | "Invalid syntax after conditional" | `connections:` block present | Remove `connections:` block entirely |
 | Publish succeeds but agent has no knowledge | Data Library not wired in GUI | Complete GUI Step 1 above |
 | Activation fails | `default_agent_user` is placeholder | Set to real org user email |
+
+## "Internal Error" Workaround
+
+If `sf agent publish authoring-bundle` fails persistently with "Internal Error,
+try again later" after fixing linked variables and re-authenticating:
+
+```
+# Step 1: Deploy the bundle metadata directly
+sf project deploy start --metadata "AiAuthoringBundle:<name>" -o <org>
+
+# Step 2: Retrieve it back (syncs server-side state)
+sf project retrieve start --metadata "AiAuthoringBundle:<name>" -o <org>
+
+# Step 3: Now try publish again
+sf agent publish authoring-bundle --api-name <name> --target-org <org>
+```
+
+If this still fails, the issue is likely org-level (Trial/SDO limitations,
+missing Einstein/Agentforce enablement). Try on a scratch org or contact
+Salesforce support.
 
 ## Typical Workflow
 
