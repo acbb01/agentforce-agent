@@ -1,0 +1,13 @@
+{
+  "name": "agentforce-agent",
+  "owner": {
+    "name": "acbb01"
+  },
+  "plugins": [
+    {
+      "name": "agentforce-agent",
+      "source": "./",
+      "description": "Build Salesforce Agentforce agents using Agent Script DSL. Full lifecycle: discover, generate, validate, publish, guide, test."
+    }
+  ]
+}
