@@ -441,17 +441,30 @@ variables:
 
 ### 22. Regional locale codes in language block
 
-Agent Script only accepts base language codes (`es`, `en`, `pt`). Regional
-variants like `es_CO`, `en_US`, `pt_BR` cause validation errors.
+Agent Script has a specific set of valid locale codes. Bare codes like `en` or
+`pt` are NOT valid — some require regional suffixes. Check the list below.
+
+Valid locales: `ar`, `bg`, `ca`, `cs`, `da`, `de`, `el`, `en_AU`, `en_GB`,
+`en_US`, `es`, `es_MX`, `et`, `fi`, `fr`, `fr_CA`, `he`, `hi`, `hr`, `hu`,
+`id`, `in`, `it`, `iw`, `ja`, `ko`, `ms`, `nl_NL`, `no`, `pl`, `pt_BR`,
+`pt_PT`, `ro`, `sv`, `th`, `tl`, `tr`, `vi`, `zh_CN`, `zh_TW`.
 
 ```
-# WRONG
+# WRONG — bare "en" is not valid
+language:
+   default_locale: "en"
+
+# WRONG — "es_CO" is not in the valid list
 language:
    default_locale: "es_CO"
 ```
 
 ```
-# RIGHT
+# RIGHT — use en_US for English
+language:
+   default_locale: "en_US"
+
+# RIGHT — use es for Spanish (covers all regions)
 language:
    default_locale: "es"
 ```

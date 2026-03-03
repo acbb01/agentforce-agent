@@ -580,9 +580,14 @@ language:
    default_locale: "<language from config>"
 ```
 
-IMPORTANT: The locale must be a base language code (`es`, `en`, `pt`, `fr`), NOT a
-regional variant (`es_CO`, `en_US`, `pt_BR`). Agent Script does not accept regional
-locales. If the config has a regional locale, strip the region suffix (e.g., `es_CO` → `es`).
+IMPORTANT: Agent Script has a strict set of valid locales. Use ONLY these values:
+`ar`, `bg`, `ca`, `cs`, `da`, `de`, `el`, `en_AU`, `en_GB`, `en_US`, `es`,
+`es_MX`, `et`, `fi`, `fr`, `fr_CA`, `he`, `hi`, `hr`, `hu`, `id`, `in`, `it`,
+`iw`, `ja`, `ko`, `ms`, `nl_NL`, `no`, `pl`, `pt_BR`, `pt_PT`, `ro`, `sv`,
+`th`, `tl`, `tr`, `vi`, `zh_CN`, `zh_TW`.
+
+Common mappings: Spanish → `es`, English → `en_US`, Portuguese (Brazil) → `pt_BR`,
+French → `fr`. Note: bare `en` and `pt` are NOT valid — use `en_US` and `pt_BR`.
 
 Do NOT include `additional_locales` or `all_additional_locales` fields unless the user
 explicitly requests multi-language support.
@@ -826,13 +831,15 @@ Write two files:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <AiAuthoringBundle xmlns="http://soap.sforce.com/2006/04/metadata">
-    <developerName>{{AGENT_NAME}}</developerName>
-    <masterLabel>{{AGENT_LABEL}}</masterLabel>
+  <bundleType>AGENT</bundleType>
 </AiAuthoringBundle>
 ```
 
-Replace `{{AGENT_NAME}}` with the agent's developer name and `{{AGENT_LABEL}}` with
-the agent's label from the config.
+CRITICAL: The `<bundleType>AGENT</bundleType>` element is REQUIRED. Without it, the
+metadata deploy fails with "Required fields are missing: [BundleType]" and `sf agent
+publish` fails with "Internal Error, try again later" (misleading error message).
+Do NOT include `<developerName>` or `<masterLabel>` in the XML — these are set from
+the `.agent` file's `config:` block during publish.
 
 ### Step 6: Present Summary
 

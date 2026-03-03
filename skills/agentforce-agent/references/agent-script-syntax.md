@@ -78,10 +78,16 @@ knowledge:
 
 ```
 language:
-   default_locale: "es_CO"
-   additional_locales: ["en_US"]
-   all_additional_locales: false
+   default_locale: "es"
 ```
+
+Valid locales: `ar`, `bg`, `ca`, `cs`, `da`, `de`, `el`, `en_AU`, `en_GB`,
+`en_US`, `es`, `es_MX`, `et`, `fi`, `fr`, `fr_CA`, `he`, `hi`, `hr`, `hu`,
+`id`, `in`, `it`, `iw`, `ja`, `ko`, `ms`, `nl_NL`, `no`, `pl`, `pt_BR`,
+`pt_PT`, `ro`, `sv`, `th`, `tl`, `tr`, `vi`, `zh_CN`, `zh_TW`.
+
+CAUTION: bare `en` and `pt` are NOT valid — use `en_US` and `pt_BR`.
+Only include `additional_locales` / `all_additional_locales` if multi-language is needed.
 
 ### start_agent \<name\>
 
