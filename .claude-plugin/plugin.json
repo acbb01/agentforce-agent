@@ -1,0 +1,9 @@
+{
+  "name": "agentforce-agent",
+  "description": "Salesforce Agentforce agent builder. Full lifecycle: requirements discovery, Agent Script DSL generation, validation, publishing, and testing. Encodes battle-tested patterns from production agent development.",
+  "version": "1.0.0",
+  "author": {
+    "name": "acbb01",
+    "url": "https://github.com/acbb01"
+  }
+}
