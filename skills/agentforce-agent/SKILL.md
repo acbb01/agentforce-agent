@@ -118,7 +118,74 @@ Typical workflow:
 ## COMMAND: discover
 
 **Purpose**: Gather requirements through a structured conversation and save them as
-a JSON config file that drives generation.
+a JSON config file that drives generation. Proactively queries the Salesforce org
+to pre-fill configuration choices and reduce back-and-forth.
+
+### Step 0: Org Probe
+
+Before asking the user anything, gather org data via the SF CLI. Run these commands
+**in parallel** (all are independent):
+
+```bash
+# 1. Check sf CLI is installed
+sf --version
+
+# 2. List connected orgs
+sf org list --json
+```
+
+**If `sf` is not installed** (command not found):
+- Warn: "Salesforce CLI (sf) not found. Org data will not be pre-filled. You can install it from https://developer.salesforce.com/tools/salesforcecli"
+- Continue without org data — all subsequent steps work without it, just with less pre-filling.
+
+**If `sf` is installed**, determine the target org:
+- If `--org` was provided, use that alias.
+- Otherwise, parse `sf org list --json` output. If a default org exists, use it.
+- If no org is available, warn: "No connected Salesforce org found. Run `sf org login web --alias <alias>` to connect one. Continuing without org data."
+- Continue without org data.
+
+**If a target org is available**, run these 4 queries **in parallel**:
+
+```bash
+# 3a. Active users (for default_agent_user picker)
+sf data query --query "SELECT Id, Name, Email, IsActive FROM User WHERE IsActive = true ORDER BY Name LIMIT 50" --target-org <alias> --json
+
+# 3b. Existing agents (naming conflict check)
+sf data query --query "SELECT DeveloperName, MasterLabel FROM BotDefinition ORDER BY DeveloperName" --target-org <alias> --json
+
+# 3c. Knowledge availability
+sf data query --query "SELECT Id, Name FROM KnowledgeArticleVersion WHERE PublishStatus = 'Online' LIMIT 1" --target-org <alias> --json
+
+# 3d. Active Flows (for action topic suggestions)
+sf data query --query "SELECT ApiName, Label, ProcessType FROM FlowDefinitionView WHERE IsActive = true AND ProcessType IN ('AutoLaunchedFlow', 'Flow') ORDER BY Label" --target-org <alias> --json
+```
+
+Each query may fail independently (permissions, object not enabled, etc.). If a query
+fails, warn per query and continue with whatever succeeded. Store all results in
+memory for use in Steps 2-4.
+
+**Present org summary** before proceeding:
+
+```
+## Org Context
+
+| Data Point | Value |
+|-----------|-------|
+| SF CLI | v2.X.X |
+| Target org | <alias> (<username>) |
+| Active users | <N> found |
+| Existing agents | <list or "none"> |
+| Knowledge articles | <N> online (or "not enabled") |
+| Active Flows | <N> found |
+
+This data will help pre-fill your agent configuration.
+```
+
+If no org data was gathered, show a simpler message:
+```
+## Org Context
+No org data available. Configuration will require manual input for user email and org details.
+```
 
 ### Step 1: Check for Existing Config
 
@@ -126,7 +193,7 @@ If `--config` was provided:
 1. Read the file at the given path.
 2. Parse the JSON and present a summary of the config to the user.
 3. Ask: "This config already exists. Use it as-is, or modify it?"
-4. If the user says use as-is, skip directly to Step 4 (save/confirm).
+4. If the user says use as-is, skip directly to Step 5 (save/confirm).
 5. If modify, proceed to Step 2 but pre-fill answers from the existing config.
 
 If `--config` was NOT provided but `--name` was provided:
@@ -135,6 +202,14 @@ If `--config` was NOT provided but `--name` was provided:
 3. If not found, proceed to Step 2.
 
 ### Step 2: Brief Capture
+
+If org data was gathered in Step 0, include it as context before the question:
+
+> I've connected to your org **<alias>** and found **<N>** active users,
+> **<N>** existing agents, and **<N>** knowledge articles. I'll use this
+> to pre-fill your configuration.
+
+If no org data was gathered, skip the context line.
 
 Use AskUserQuestion to ask ONE main question. Do not split this into multiple
 questions. The user should be able to provide a rich description in one pass.
@@ -155,7 +230,7 @@ into the assumptions in Step 3.
 
 From the user's description (and brand voice document if provided), generate a
 structured summary with EXPLICIT assumptions. Every assumption must be visible so
-the user can correct it.
+the user can correct it. **Pre-fill with org data where available.**
 
 Present the following:
 
@@ -167,13 +242,38 @@ Present the following:
 **Type**: [FAQ-only / Transactional / Mixed]
 **Language**: [inferred from description, or from --language flag]
 **Channel**: [from --channel flag, or inferred from description]
+```
 
+**Agent name conflict check** (if org data available):
+- Compare the agent name against existing BotDefinition DeveloperNames from Step 0.
+- If no conflict: `No conflict with existing agents: [list of existing agent names]`
+- If conflict: `CONFLICT: Agent "<name>" already exists in the org. Choose a different name or overwrite.`
+
+```
 ### Topics Detected
 1. [Topic name] — [one-line description] — Type: [FAQ / Action]
    - If Action: Flow target? Required inputs? Expected outputs?
 2. [Topic name] — [one-line description] — Type: [FAQ / Action]
    ...
+```
 
+**Action topic suggestions** (if org data available and user described transactional
+needs): Cross-reference the user's description against active Flows from Step 0.
+If plausible matches exist, present them:
+
+```
+### Detected Flows (potential action targets)
+| Flow API Name | Label | Type |
+|---------------|-------|------|
+| Get_Customer_Balance | Check Balance | AutoLaunchedFlow |
+| Process_Return | Process Return | AutoLaunchedFlow |
+
+Which of these should the agent invoke? (Select or skip)
+```
+
+Use AskUserQuestion with the matching Flows as options (plus "None of these").
+
+```
 ### Brand Voice (Inferred)
 - Register: [tu / usted / formal / informal]
 - Tone: [warm-professional / friendly / corporate / other]
@@ -187,9 +287,25 @@ Present the following:
 ### Knowledge Base
 - Enabled: [yes / no — yes if any FAQ topics detected]
 - Citations: [false — default, rarely changed]
+- Source: [will be determined in Step 4]
+```
 
+**Salesforce Configuration — default_agent_user**:
+
+If org data includes active users, present a picker using AskUserQuestion:
+```
 ### Salesforce Configuration
-- default_agent_user: [MUST BE PROVIDED — ask if not known]
+Select the default agent user (the Salesforce user the agent runs as):
+  1. admin@company.com (Admin User)
+  2. service@company.com (Service User)
+  3. agentforce@company.com (Agentforce User)
+  [Other — type email]
+```
+
+If no org data, ask the user to type the email directly:
+```
+### Salesforce Configuration
+- default_agent_user: [Required — provide the Salesforce user email the agent will run as]
 - Target org: [from --org flag, or "not specified — will be needed for validate/publish"]
 ```
 
@@ -199,7 +315,52 @@ or describe corrections."
 
 Iterate: apply corrections, re-present, and ask again until the user confirms.
 
-### Step 4: Save Config
+### Step 4: Knowledge Strategy
+
+Determine the knowledge source for the agent. Follow this priority order:
+
+**1. File-based Data Library (preferred)**
+
+Ask: "Do you have FAQ or knowledge content as files (.csv, .md, .txt, .pdf) that
+the agent should use as its knowledge base?"
+
+If yes:
+- Ask for the file path or directory.
+- If in an SFDX project, check common locations: `force-app/main/default/datalibraries/`,
+  `kb/`, `data/`, and the project root for `.csv`, `.md`, `.txt` files.
+- If files are found, confirm them with the user.
+- If no files exist but the user wants file-based KB, offer to generate a template
+  FAQ CSV:
+  ```csv
+  Question,Answer,Category
+  "How do I earn points?","You earn points by...","General"
+  "What is the exchange rate?","The exchange rate is...","Rewards"
+  ```
+  Generate 3-5 example rows based on the topics detected in Step 3.
+  Save to `<project-root>/kb/<agent-name>-faq.csv`.
+- Set in config: `knowledge.source: "data-library-file"`, `knowledge.dataLibraryPath: "<path>"`
+
+**2. Org Knowledge (fallback)**
+
+If the user has no files but org data from Step 0 shows Knowledge articles exist:
+- Report: "Your org has <N> published Knowledge articles. The agent can use org
+  Knowledge as its source instead of file-based Data Library."
+- Ask: "Use org Knowledge articles as the knowledge source?"
+- If yes, set: `knowledge.source: "org-knowledge"`
+
+**3. No knowledge**
+
+If neither file-based nor org Knowledge is available or desired:
+- Set: `knowledge.enabled: false`
+- Warn: "Without a knowledge source, FAQ topics will produce generic answers with
+  no grounding. Consider adding a Data Library before publishing."
+
+**Important**: Regardless of the knowledge source chosen, the Data Library must still
+be wired in the Agentforce Builder GUI after publishing (see COMMAND: guide, Step 1).
+The `knowledge.source` field in the config records the *intended* source so the guide
+command can provide specific instructions.
+
+### Step 5: Save Config
 
 1. Determine the SFDX project root by searching for `sfdx-project.json` in the
    current working directory and its parent directories.
@@ -229,11 +390,20 @@ The JSON structure:
   },
   "knowledge": {
     "enabled": true,
-    "citationsEnabled": false
+    "citationsEnabled": false,
+    "source": "data-library-file",
+    "dataLibraryPath": "kb/my_agent-faq.csv"
   },
   "salesforce": {
-    "defaultAgentUser": "user@org.ext",
-    "targetOrg": "MyOrgAlias"
+    "defaultAgentUser": "service@company.com",
+    "targetOrg": "MyOrgAlias",
+    "orgProbe": {
+      "cliVersion": "2.113.6",
+      "userCount": 47,
+      "existingAgents": ["agent_1", "agent_2"],
+      "knowledgeArticles": 125,
+      "activeFlows": ["Get_Customer_Balance", "Process_Return"]
+    }
   },
   "topics": [
     {
@@ -255,6 +425,10 @@ The JSON structure:
   ]
 }
 ```
+
+The `salesforce.orgProbe` field is populated from Step 0 data. If no org was probed,
+omit this field entirely. The `knowledge.source` and `knowledge.dataLibraryPath`
+fields come from Step 4. If source is `"org-knowledge"`, omit `dataLibraryPath`.
 
 Report to the user:
 
@@ -846,6 +1020,12 @@ Conditional notes:
 - If the agent has NO knowledge block (transactional-only), note that Step 1 can
   be skipped: "This agent is transactional-only with no knowledge block. Step 1
   (Data Library) can be skipped."
+- If `knowledge.source` is `"data-library-file"` in the config, add to Step 1:
+  "Your config specifies a file-based Data Library at `<dataLibraryPath>`. Make sure
+  this file has been uploaded to the Data Library in Setup before wiring it here."
+- If `knowledge.source` is `"org-knowledge"`, add to Step 1:
+  "Your config specifies org Knowledge articles as the source. Select the appropriate
+  Knowledge base when wiring the Data Library."
 - If `--org` was not provided, omit the CLI command in Step 3 and note that the
   org alias is needed.
 
